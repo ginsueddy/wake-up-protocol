@@ -4,8 +4,8 @@ Double-clap to boot up your dev environment. On trigger:
 
 1. Opens a YouTube video in the browser
 2. Opens one new Terminal.app window
-3. Starts Claude Code in the first tab (in `~/github/cuddy`)
-4. Starts Codex in the second tab (in `~/github/cuddy`)
+3. Starts Codex in the first tab (in `~/github/cuddy`)
+4. Starts Claude Code in the second tab (in `~/github/cuddy`)
 
 ## Setup
 
@@ -48,7 +48,7 @@ kill $(cat wake_up.pid)
 | `--cooldown` | 5.0 | Seconds to ignore after a trigger |
 | `--double-clap-window` | 0.5 | Max seconds between two claps |
 | `--url` | (hardcoded) | YouTube URL to open |
-| `--project-dir` | ~/github/cuddy | Directory for Claude Code and Codex |
+| `--project-dir` | ~/github/cuddy | Directory for Codex and Claude Code |
 | `--device` | system default | Audio input device index |
 | `--calibrate` | | Run calibration mode for 10s |
 | `--verbose` | | Enable debug logging |

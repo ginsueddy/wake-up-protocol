@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wake Up Protocol — double-clap triggers YouTube, Claude Code, and Codex."""
+"""Wake Up Protocol — double-clap triggers YouTube, Codex, and Claude Code."""
 from __future__ import annotations
 
 import argparse
@@ -64,16 +64,16 @@ def wake_up_actions(url: str, project_dir: str):
     webbrowser.open(url)
     time.sleep(0.4)
 
-    # Action 2 & 3: Claude Code + Codex in one Terminal window, two tabs
-    log.info("launching Claude Code and Codex in %s", expanded_project_dir)
+    # Action 2 & 3: Codex + Claude Code in one Terminal window, two tabs
+    log.info("launching Codex and Claude Code in %s", expanded_project_dir)
     applescript_lines = [
         f'set projectDir to "{applescript_project_dir}"',
         f'set profileName to "{applescript_profile}"',
-        'set claudeCommand to "cd " & quoted form of projectDir & " && claude"',
         'set codexCommand to "cd " & quoted form of projectDir & " && codex"',
+        'set claudeCommand to "cd " & quoted form of projectDir & " && claude"',
         'tell application "Terminal"',
         '    activate',
-        '    do script claudeCommand',
+        '    do script codexCommand',
         '    set theWindow to front window',
         'end tell',
         'delay 0.5',
@@ -86,8 +86,8 @@ def wake_up_actions(url: str, project_dir: str):
         'end tell',
         'delay 0.5',
         'tell application "Terminal"',
-        '    set codexWindow to front window',
-        '    do script codexCommand in codexWindow',
+        '    set claudeWindow to front window',
+        '    do script claudeCommand in claudeWindow',
         'end tell',
     ]
     osascript_command = ["osascript"]
@@ -296,7 +296,7 @@ def main() -> int:
     parser.add_argument("--url", default=YOUTUBE_URL,
                         help=f"YouTube URL to open (default: {YOUTUBE_URL})")
     parser.add_argument("--project-dir", default=PROJECT_DIR,
-                        help=f"project directory for Claude Code and Codex (default: {PROJECT_DIR})")
+                        help=f"project directory for Codex and Claude Code (default: {PROJECT_DIR})")
     parser.add_argument("--device", type=int, default=None,
                         help="audio input device index (default: system default)")
     parser.add_argument("--calibrate", action="store_true",
