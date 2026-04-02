@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
+import os
 import signal
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import webbrowser
@@ -37,25 +40,83 @@ MAX_LOUD_BLOCKS = 5
 MIN_CREST_FACTOR = 4.0
 # Quiet threshold: must drop below this absolute level to confirm clap ended
 QUIET_ABSOLUTE = 0.08
+LOCK_PATH = os.path.join(tempfile.gettempdir(), "wake_up_protocol.lock")
 
 
 def wake_up_actions(url: str, project_dir: str):
     """Fire all wake-up actions simultaneously."""
     log.info("WAKE UP PROTOCOL ACTIVATED")
+    expanded_project_dir = os.path.abspath(os.path.expanduser(project_dir))
+    applescript_project_dir = (
+        expanded_project_dir.replace("\\", "\\\\").replace('"', '\\"')
+    )
+    try:
+        terminal_profile = subprocess.check_output(
+            ["defaults", "read", "com.apple.Terminal", "Startup Window Settings"],
+            text=True,
+        ).strip()
+    except subprocess.SubprocessError:
+        terminal_profile = "Basic"
+    applescript_profile = terminal_profile.replace("\\", "\\\\").replace('"', '\\"')
 
     # Action 1: YouTube video
     log.info("opening %s", url)
     webbrowser.open(url)
+    time.sleep(0.4)
 
-    # Action 2: Claude Code in Terminal.app
-    log.info("launching Claude Code in %s", project_dir)
-    subprocess.Popen(["osascript", "-e",
-        f'tell application "Terminal" to do script "cd {project_dir} && claude"'])
+    # Action 2 & 3: Claude Code + Codex in one Terminal window, two tabs
+    log.info("launching Claude Code and Codex in %s", expanded_project_dir)
+    applescript_lines = [
+        f'set projectDir to "{applescript_project_dir}"',
+        f'set profileName to "{applescript_profile}"',
+        'set claudeCommand to "cd " & quoted form of projectDir & " && claude"',
+        'set codexCommand to "cd " & quoted form of projectDir & " && codex"',
+        'tell application "Terminal"',
+        '    activate',
+        '    do script claudeCommand',
+        '    set theWindow to front window',
+        'end tell',
+        'delay 0.5',
+        'tell application "System Events"',
+        '    tell process "Terminal"',
+        '        set frontmost to true',
+        '        click menu item "New Tab" of menu "Shell" of menu bar 1',
+        '        click menu item profileName of menu 1 of menu item "New Tab" of menu "Shell" of menu bar 1',
+        '    end tell',
+        'end tell',
+        'delay 0.5',
+        'tell application "Terminal"',
+        '    set codexWindow to front window',
+        '    do script codexCommand in codexWindow',
+        'end tell',
+    ]
+    osascript_command = ["osascript"]
+    for line in applescript_lines:
+        osascript_command.extend(["-e", line])
+    result = subprocess.run(
+        osascript_command,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        log.error("Terminal launcher failed: %s", result.stderr.strip() or result.returncode)
+    elif result.stdout.strip():
+        log.debug("Terminal launcher result: %s", result.stdout.strip())
 
-    # Action 3: Codex in Terminal.app
-    log.info("launching Codex in %s", project_dir)
-    subprocess.Popen(["osascript", "-e",
-        f'tell application "Terminal" to do script "cd {project_dir} && codex"'])
+
+def acquire_single_instance_lock():
+    """Prevent multiple listeners from reacting to the same clap."""
+    lock_file = open(LOCK_PATH, "w", encoding="utf-8")
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock_file.close()
+        raise RuntimeError(
+            f"Wake Up Protocol is already running. Stop the existing process or remove {LOCK_PATH}."
+        )
+    lock_file.write(str(os.getpid()))
+    lock_file.flush()
+    return lock_file
 
 
 class ClapDetector:
@@ -194,6 +255,8 @@ class ClapDetector:
                 if self._trigger_event.wait(timeout=0.1):
                     self._trigger_event.clear()
                     wake_up_actions(self.url, self.project_dir)
+                    log.info("Wake Up Protocol complete — shutting down")
+                    self._shutdown_event.set()
 
         log.info("Wake Up Protocol disarmed")
 
@@ -249,8 +312,17 @@ def main() -> int:
         stream=sys.stderr,
     )
 
+    try:
+        lock_file = acquire_single_instance_lock()
+    except RuntimeError as exc:
+        log.error("%s", exc)
+        return 1
+
     if args.calibrate:
-        calibrate(args.device)
+        try:
+            calibrate(args.device)
+        finally:
+            lock_file.close()
         return 0
 
     detector = ClapDetector(
@@ -262,7 +334,10 @@ def main() -> int:
         project_dir=args.project_dir,
         device=args.device,
     )
-    detector.run()
+    try:
+        detector.run()
+    finally:
+        lock_file.close()
     return 0
 
 

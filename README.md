@@ -3,8 +3,9 @@
 Double-clap to boot up your dev environment. On trigger:
 
 1. Opens a YouTube video in the browser
-2. Launches Claude Code in Terminal.app (in `~/github/cuddy`)
-3. Launches Codex in Terminal.app (in `~/github/cuddy`)
+2. Opens one new Terminal.app window
+3. Starts Claude Code in the first tab (in `~/github/cuddy`)
+4. Starts Codex in the second tab (in `~/github/cuddy`)
 
 ## Setup
 
