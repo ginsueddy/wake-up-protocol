@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 wake_up.log
 wake_up.pid
+wake_trigger
+logs/

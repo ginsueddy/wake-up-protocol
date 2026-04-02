@@ -122,7 +122,7 @@ def acquire_single_instance_lock():
 class ClapDetector:
     def __init__(self, threshold: float, cooldown: float, window: float,
                  min_gap: float, url: str, project_dir: str,
-                 device: int | None):
+                 device: int | None, timeout: float | None = None):
         self.threshold = threshold
         self.cooldown = cooldown
         self.window = window
@@ -130,6 +130,8 @@ class ClapDetector:
         self.url = url
         self.project_dir = project_dir
         self.device = device
+        self.timeout = timeout
+        self._triggered = False
         self._state = STATE_IDLE
         self._spike_time = 0.0
         self._spike_crest = 0.0
@@ -245,8 +247,11 @@ class ClapDetector:
 
         log.info("Wake Up Protocol armed  threshold=%.2f  cooldown=%.1fs",
                  self.threshold, self.cooldown)
+        if self.timeout:
+            log.info("timeout=%.0fs — will exit if no clap detected", self.timeout)
         log.info("listening for double claps... (Ctrl+C to stop)")
 
+        start_time = time.monotonic()
         with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE,
                                 dtype="float32", channels=1,
                                 device=self.device,
@@ -255,7 +260,12 @@ class ClapDetector:
                 if self._trigger_event.wait(timeout=0.1):
                     self._trigger_event.clear()
                     wake_up_actions(self.url, self.project_dir)
+                    self._triggered = True
                     log.info("Wake Up Protocol complete — shutting down")
+                    self._shutdown_event.set()
+                elif self.timeout and (time.monotonic() - start_time) >= self.timeout:
+                    log.info("timeout reached (%.0fs), no clap detected — shutting down",
+                             self.timeout)
                     self._shutdown_event.set()
 
         log.info("Wake Up Protocol disarmed")
@@ -299,6 +309,8 @@ def main() -> int:
                         help=f"project directory for Codex and Claude Code (default: {PROJECT_DIR})")
     parser.add_argument("--device", type=int, default=None,
                         help="audio input device index (default: system default)")
+    parser.add_argument("--timeout", type=float, default=None,
+                        help="exit after N seconds if no clap detected")
     parser.add_argument("--calibrate", action="store_true",
                         help="run calibration mode for 10s")
     parser.add_argument("--verbose", action="store_true",
@@ -333,12 +345,13 @@ def main() -> int:
         url=args.url,
         project_dir=args.project_dir,
         device=args.device,
+        timeout=args.timeout,
     )
     try:
         detector.run()
     finally:
         lock_file.close()
-    return 0
+    return 0 if detector._triggered else 2
 
 
 if __name__ == "__main__":

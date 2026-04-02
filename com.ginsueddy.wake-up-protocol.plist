@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ginsueddy.wake-up-protocol</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ginsueddy/github/wake-up-protocol/wake_trigger</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>WAKE_UP_PROJECT_DIR</key>
+        <string>/Users/ginsueddy/github/wake-up-protocol</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/ginsueddy/github/wake-up-protocol/logs/trigger.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ginsueddy/github/wake-up-protocol/logs/trigger.log</string>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
