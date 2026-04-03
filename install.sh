@@ -37,6 +37,19 @@ install() {
     launchctl bootstrap "gui/$UID_NUM" "$PLIST_DST"
     echo "  LaunchAgent loaded."
 
+    # Check for DND shortcut
+    if shortcuts list 2>/dev/null | grep -qx "Enable DND"; then
+        echo "  Found 'Enable DND' shortcut ✓"
+    else
+        echo
+        echo "⚠  OPTIONAL: Create an 'Enable DND' shortcut to auto-silence notifications."
+        echo "   1. Open Shortcuts.app"
+        echo "   2. Create a new shortcut named exactly: Enable DND"
+        echo "   3. Add the 'Set Focus' action"
+        echo "   4. Configure it to turn ON 'Do Not Disturb'"
+        echo "   5. Set duration to 'Until I turn it off'"
+    fi
+
     echo
     echo "=== Installed successfully ==="
     echo

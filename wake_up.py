@@ -41,11 +41,42 @@ MIN_CREST_FACTOR = 4.0
 # Quiet threshold: must drop below this absolute level to confirm clap ended
 QUIET_ABSOLUTE = 0.08
 LOCK_PATH = os.path.join(tempfile.gettempdir(), "wake_up_protocol.lock")
+DND_SHORTCUT_NAME = "Enable DND"
+
+
+def enable_dnd():
+    """Enable macOS Do Not Disturb via Shortcuts.app."""
+    log.info("enabling Do Not Disturb via Shortcuts")
+    try:
+        result = subprocess.run(
+            ["shortcuts", "run", DND_SHORTCUT_NAME],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            log.warning(
+                "failed to enable DND (shortcut '%s' may not exist): %s",
+                DND_SHORTCUT_NAME,
+                result.stderr.strip() or f"exit code {result.returncode}",
+            )
+            return False
+    except FileNotFoundError:
+        log.warning("'shortcuts' CLI not found — skipping DND")
+        return False
+    except subprocess.TimeoutExpired:
+        log.warning("DND shortcut timed out — skipping")
+        return False
+    log.info("Do Not Disturb enabled")
+    return True
 
 
 def wake_up_actions(url: str, project_dir: str):
     """Fire all wake-up actions simultaneously."""
     log.info("WAKE UP PROTOCOL ACTIVATED")
+
+    # Action 0: Silence notifications immediately
+    enable_dnd()
     expanded_project_dir = os.path.abspath(os.path.expanduser(project_dir))
     applescript_project_dir = (
         expanded_project_dir.replace("\\", "\\\\").replace('"', '\\"')

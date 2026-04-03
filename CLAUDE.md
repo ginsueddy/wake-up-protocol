@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-macOS automation tool: double-clap (audio detection) or system wake/unlock triggers a dev environment launch — opens a YouTube video, then starts Codex and Claude Code in separate Terminal.app tabs pointed at `~/github/cuddy`.
+macOS automation tool: double-clap (audio detection) or system wake/unlock triggers a dev environment launch — enables Do Not Disturb, opens a YouTube video, then starts Codex and Claude Code in separate Terminal.app tabs pointed at `~/github/cuddy`.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ Two-layer design:
 
 1. **wake_trigger.swift** — Compiled Swift daemon registered as a macOS LaunchAgent. Listens for `NSWorkspace.didWakeNotification` and `com.apple.screenIsUnlocked` events. On trigger, spawns `wake_up.py --timeout 120` with 10-second debounce. Checks a lock file to avoid duplicate spawns.
 
-2. **wake_up.py** — Python audio listener with a 4-state clap detection state machine (`IDLE → SPIKE_DETECTED → FIRST_CLAP → SECOND_SPIKE`). Uses sounddevice for real-time audio. On double-clap detection, runs AppleScript via `osascript` to open browser + Terminal tabs. Single-instance enforcement via `/tmp/wake_up_protocol.lock`.
+2. **wake_up.py** — Python audio listener with a 4-state clap detection state machine (`IDLE → SPIKE_DETECTED → FIRST_CLAP → SECOND_SPIKE`). Uses sounddevice for real-time audio. On double-clap detection, enables Do Not Disturb (via `shortcuts run "Enable DND"`), then runs AppleScript via `osascript` to open browser + Terminal tabs. Single-instance enforcement via `/tmp/wake_up_protocol.lock`. DND requires a one-time Shortcuts.app setup (see `install.sh` output for instructions).
 
 **install.sh** compiles the Swift source, symlinks the plist to `~/Library/LaunchAgents/`, and loads it with `launchctl`.
 
