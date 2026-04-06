@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wake Up Protocol — double-clap triggers YouTube, Codex, and Claude Code."""
+"""Wake Up Protocol — double-clap triggers Spotify, Codex, and Claude Code."""
 from __future__ import annotations
 
 import argparse
@@ -13,11 +13,9 @@ import sys
 import tempfile
 import threading
 import time
-import webbrowser
-
 import sounddevice as sd
 
-YOUTUBE_URL = "https://youtu.be/xMaE6toi4mk?si=CWhHdUmFd6OdACn0"
+SPOTIFY_TRACK_URI = "spotify:track:39shmbIHICJ2Wxnk1fPSdz"
 PROJECT_DIR = "~/github/cuddy"
 SAMPLE_RATE = 44100
 BLOCK_SIZE = 1024
@@ -71,7 +69,39 @@ def enable_dnd():
     return True
 
 
-def wake_up_actions(url: str, project_dir: str):
+def play_spotify(track_uri: str):
+    """Play a Spotify track, launching the app first if needed."""
+    log.info("playing Spotify track %s", track_uri)
+    escaped_uri = track_uri.replace("\\", "\\\\").replace('"', '\\"')
+    applescript_lines = [
+        'if application "Spotify" is running then',
+        '    tell application "Spotify"',
+        f'        play track "{escaped_uri}"',
+        '    end tell',
+        'else',
+        '    tell application "Spotify" to activate',
+        '    repeat 20 times',
+        '        delay 0.5',
+        '        if application "Spotify" is running then',
+        '            tell application "Spotify"',
+        '                try',
+        f'                    play track "{escaped_uri}"',
+        '                    return',
+        '                end try',
+        '            end tell',
+        '        end if',
+        '    end repeat',
+        'end if',
+    ]
+    osascript_command = ["osascript"]
+    for line in applescript_lines:
+        osascript_command.extend(["-e", line])
+    result = subprocess.run(osascript_command, capture_output=True, text=True)
+    if result.returncode != 0:
+        log.error("Spotify playback failed: %s", result.stderr.strip() or result.returncode)
+
+
+def wake_up_actions(track_uri: str, project_dir: str):
     """Fire all wake-up actions simultaneously."""
     log.info("WAKE UP PROTOCOL ACTIVATED")
 
@@ -90,10 +120,8 @@ def wake_up_actions(url: str, project_dir: str):
         terminal_profile = "Basic"
     applescript_profile = terminal_profile.replace("\\", "\\\\").replace('"', '\\"')
 
-    # Action 1: YouTube video
-    log.info("opening %s", url)
-    webbrowser.open(url)
-    time.sleep(0.4)
+    # Action 1: Spotify
+    play_spotify(track_uri)
 
     # Action 2 & 3: Codex + Claude Code in one Terminal window, two tabs
     log.info("launching Codex and Claude Code in %s", expanded_project_dir)
@@ -152,13 +180,13 @@ def acquire_single_instance_lock():
 
 class ClapDetector:
     def __init__(self, threshold: float, cooldown: float, window: float,
-                 min_gap: float, url: str, project_dir: str,
+                 min_gap: float, track_uri: str, project_dir: str,
                  device: int | None, timeout: float | None = None):
         self.threshold = threshold
         self.cooldown = cooldown
         self.window = window
         self.min_gap = min_gap
-        self.url = url
+        self.track_uri = track_uri
         self.project_dir = project_dir
         self.device = device
         self.timeout = timeout
@@ -290,7 +318,7 @@ class ClapDetector:
             while not self._shutdown_event.is_set():
                 if self._trigger_event.wait(timeout=0.1):
                     self._trigger_event.clear()
-                    wake_up_actions(self.url, self.project_dir)
+                    wake_up_actions(self.track_uri, self.project_dir)
                     self._triggered = True
                     log.info("Wake Up Protocol complete — shutting down")
                     self._shutdown_event.set()
@@ -334,8 +362,8 @@ def main() -> int:
                         help=f"seconds to ignore after trigger (default: {COOLDOWN_SECONDS})")
     parser.add_argument("--double-clap-window", type=float, default=DOUBLE_CLAP_WINDOW,
                         help=f"max seconds between two claps (default: {DOUBLE_CLAP_WINDOW})")
-    parser.add_argument("--url", default=YOUTUBE_URL,
-                        help=f"YouTube URL to open (default: {YOUTUBE_URL})")
+    parser.add_argument("--spotify-track", default=SPOTIFY_TRACK_URI,
+                        help=f"Spotify track URI to play (default: {SPOTIFY_TRACK_URI})")
     parser.add_argument("--project-dir", default=PROJECT_DIR,
                         help=f"project directory for Codex and Claude Code (default: {PROJECT_DIR})")
     parser.add_argument("--device", type=int, default=None,
@@ -373,7 +401,7 @@ def main() -> int:
         cooldown=args.cooldown,
         window=args.double_clap_window,
         min_gap=DOUBLE_CLAP_MIN_GAP,
-        url=args.url,
+        track_uri=args.spotify_track,
         project_dir=args.project_dir,
         device=args.device,
         timeout=args.timeout,
